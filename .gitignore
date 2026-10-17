@@ -355,3 +355,7 @@ TSWLatexianTemp*
 
 # standalone packages
 *.sta
+
+# Local development and generated training outputs
+.idea/
+/RICE*_results/

@@ -1,0 +1,1 @@
+--config config.yml --test_dir C:/Users/Administrator/Desktop/结果分析/256/osm16 --out_dir C:/Users/Administrator/Desktop/结果分析/256/osm16/SPANet --pretrained RICE1_2_ALLMERGED_results/000013/models/gen_model_epoch_150.pth --cuda

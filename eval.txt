@@ -1,0 +1,121 @@
+import numpy as np
+import torch
+from skimage.metrics import structural_similarity as SSIM  # 可替换为PIQ版本
+from torch.autograd import Variable
+from utils import save_image
+from skimage.util.dtype import dtype_range
+
+from piq import fsim as FSIM, psnr as PIQ_PSNR, ssim as PIQ_SSIM  # 统一使用PIQ指标
+
+try:
+    from sewar.full_ref import uqi as UIQI  # UIQI 实现
+except ImportError:
+    raise ImportError("UIQI goes wrong")
+
+
+def test(config, test_data_loader, gen, criterionMSE, epoch):
+    avg_mse = 0
+    avg_psnr = 0
+    avg_ssim = 0
+    avg_uiqi = 0
+    avg_fsim = 0
+    avg_cc = 0
+
+    for i, batch in enumerate(test_data_loader):
+        x, t = Variable(batch[0]), Variable(batch[1])
+        if config.cuda:
+            x = x.cuda(0)
+            t = t.cuda(0)
+
+        att, out = gen(x)
+
+        # 可视化保存部分
+        if epoch % config.snapshot_interval == 0:
+            h, w, c = 1, 3, 3
+            width, height = config.width, config.height
+            allim = np.zeros((h, w, c, width, height))
+
+            x_ = x.cpu().numpy()[0]
+            t_ = t.cpu().numpy()[0]
+            out_ = out.cpu().numpy()[0]
+
+            in_rgb = x_[:3]
+            t_rgb = t_[:3]
+            out_rgb = np.clip(out_[:3], 0, 1)  # 确保范围在[0,1]
+
+            allim[0, 0, :] = in_rgb * 255
+            allim[0, 1, :] = out_rgb * 255
+            allim[0, 2, :] = t_rgb * 255
+
+            allim = allim.transpose(0, 3, 1, 4, 2).reshape((h * height, w * width, c))
+            save_image(config.out_dir, allim, i, epoch)
+
+        # 获取输出和真实图像（限制范围在[0,1]）
+        out_clamped = torch.clamp(out[:, :3], 0, 1)  # [B, C, H, W]
+        t_clamped = torch.clamp(t[:, :3], 0, 1)
+
+        # 计算FSIM（使用PIQ，输入需为4D张量）
+        fsim_val = FSIM(out_clamped, t_clamped)
+        mse = criterionMSE(out_clamped, t_clamped)
+        psnr = PIQ_PSNR(out_clamped, t_clamped, data_range=1.0)
+        ssim = PIQ_SSIM(out_clamped, t_clamped, data_range=1.0)
+
+        # 转换为 uint8 [H, W, C] 格式（仅限UIQI使用）
+        out_np = out_clamped[0].cpu().numpy().transpose(1, 2, 0)  # CHW -> HWC
+        t_np = t_clamped[0].cpu().numpy().transpose(1, 2, 0)
+        out_uint8 = (out_np * 255).astype(np.uint8)
+        t_uint8 = (t_np * 255).astype(np.uint8)
+        uiqi = UIQI(t_uint8, out_uint8)
+
+        out_flat = out_clamped.view(out_clamped.size(0), -1)  # [B, C*H*W]
+        t_flat = t_clamped.view(t_clamped.size(0), -1)
+
+        # 均值中心化
+        mu_out = torch.mean(out_flat, dim=1, keepdim=True)
+        mu_t = torch.mean(t_flat, dim=1, keepdim=True)
+
+        # 协方差和标准差
+        cov = torch.mean((out_flat - mu_out) * (t_flat - mu_t), dim=1)
+        std_out = torch.std(out_flat, dim=1, unbiased=False)
+        std_t = torch.std(t_flat, dim=1, unbiased=False)
+
+        # 相关系数（添加epsilon防止除零）
+        cc = cov / (std_out * std_t + 1e-8)
+        batch_cc = cc.mean().item()
+
+        # 累加指标（PIQ指标已自动取batch平均）
+        avg_mse += mse.item()
+        avg_psnr += psnr.item()
+        avg_ssim += ssim.item()
+        avg_uiqi += uiqi
+        avg_fsim += fsim_val.item()
+        avg_cc += batch_cc
+
+    # 计算平均指标
+    num_batches = len(test_data_loader)
+    avg_mse /= num_batches
+    avg_psnr /= num_batches
+    avg_ssim /= num_batches
+    avg_uiqi /= num_batches
+    avg_fsim /= num_batches
+    avg_cc /= num_batches
+
+    # 打印结果
+    print("===> Avg. MSE: {:.4f}".format(avg_mse))
+    print("===> Avg. PSNR: {:.4f} dB".format(avg_psnr))
+    print("===> Avg. SSIM: {:.4f}".format(avg_ssim))
+    print("===> Avg. UIQI: {:.4f}".format(avg_uiqi))
+    print("===> Avg. FSIM: {:.4f}".format(avg_fsim))
+    print("===> Avg. CC: {:.4f}".format(avg_cc))
+
+    # 返回日志
+    log_test = {
+        'epoch': epoch,
+        'mse': avg_mse,
+        'psnr': avg_psnr,
+        'ssim': avg_ssim,
+        'uiqi': avg_uiqi,
+        'fsim': avg_fsim,
+        'cc': avg_cc
+    }
+    return log_test

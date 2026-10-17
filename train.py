@@ -44,6 +44,7 @@ def train(config):
 
     gen = Generator(gpu_ids=config.gpu_ids)
 
+
     if config.gen_init is not None:
         param = torch.load(config.gen_init)
         gen.load_state_dict(param)

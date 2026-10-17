@@ -1,0 +1,13 @@
+torch~=2.5.1+cu121
+numpy~=1.26.4
+torchvision~=0.20.1+cu121
+PyYAML~=6.0.2
+attrdict~=2.0.1
+tqdm~=4.67.1
+matplotlib~=3.10.1
+opencv-python~=4.11.0.86
+scikit-image~=0.25.2
+piq~=0.8.0
+pandas~=2.2.3
+networkx~=3.4.2
+pillow~=10.4.0

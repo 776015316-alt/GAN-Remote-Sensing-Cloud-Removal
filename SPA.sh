@@ -1,0 +1,2 @@
+python predict.py --config /media/xiaoqingm/63C354536EA822D7/experiments/CloudRemoval/SpA-GAN_for_cloud_removal/config.yml --test_dir /media/xiaoqingm/63C354536EA822D7/experiments/CloudRemoval/SpA-GAN_for_cloud_removal/data/RICE_DATASET/RICE2 --out_dir /media/xiaoqingm/63C354536EA822D7/experiments/CloudRemoval/SpA-GAN_for_cloud_removal/RICE2_results --pretrained ./pretrained_models/RICE2/gen_model_epoch_200.pth --cuda
+python train.py

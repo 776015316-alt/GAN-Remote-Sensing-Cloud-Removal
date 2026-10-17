@@ -1,14 +1,15 @@
-import numpy as np
 import argparse
-from cv2 import cv2
-import matplotlib.pyplot as plt
 import time
 
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
+import cv2
 from torch.autograd import Variable
 
-from utils import gpu_manage, heatmap
 from models.gen.SPANet import Generator
+from utils import gpu_manage, heatmap
+
 
 def show(img):
     cv2.imshow('image', img)
